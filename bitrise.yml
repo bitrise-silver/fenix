@@ -2,20 +2,189 @@
 format_version: '11'
 default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 project_type: android
+
+pipelines:
+  benchmark:
+    stages:
+    - benchmark: {}
+
+stages:
+  benchmark:
+    workflows:
+    - java-11-elite-xl-linux-docker-android-20.04: {}
+    - java-17-elite-xl-linux-docker-android-20.04: {}
+    - java-11-g2.8core-osx-xcode-14.1.x: {}
+    - java-11-g2.12core-osx-xcode-14.1.x: {}
+    - java-11-g2-m1.8core-osx-xcode-14.1.x: {}
+    - java-17-g2.8core-osx-xcode-14.1.x: {}
+    - java-17-g2.12core-osx-xcode-14.1.x: {}
+    - java-17-g2-m1.8core-osx-xcode-14.1.x: {}
+    
 workflows:
-  trigger:
+  _build:
     steps:
     - activate-ssh-key@4: {}
     - git-clone@6:
         inputs:
         - update_submodules: 'no'
-    - git::https://github.com/bitrise-silver/steps-dynamic-workflow.git@main:
+    - install-missing-android-tools@3:
         inputs:
-        - template_file: benchmark/bitrise.tmpl
-        - value_file: benchmark/values.yml
-        - repository_url: git@github.com:bitrise-silver/fenix.git
-        - access_token: Tnts6G_Ublp8qAYjbkGvhbeswZ4ffcjt9C6eAX6oQwd1EQgiEOXsfvUcS_OBNaaYt6Hz4QSEfnMHEdbd84rhYA
-        - pipeline_id: benchmark
+        - gradlew_path: "$PROJECT_LOCATION/gradlew"
+    - android-lint@0:
+        inputs:
+        - variant: debug
+    - gradle-runner@2:
+        inputs:
+        - gradle_task: detekt ktlint
+        - gradle_file: ''
+        - gradlew_path: "$BITRISE_SOURCE_DIR/gradlew"
+    - change-android-versioncode-and-versionname@1: {}
+    - android-build@1:
+        inputs:
+        - project_location: "$PROJECT_LOCATION"
+        - module: "$MODULE"
+        - build_type: aab
+        - variant: release
+  _openjdk64-11:
+    steps:
+    - script@1:
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # make pipelines' return status equal the last command to exit with a non-zero status, or zero if all commands exit successfully
+            set -o pipefail
+            # debug log
+            set -x
+
+            jenv global openjdk64-11.0.11
+            export JAVA_HOME="$(jenv prefix)"
+            envman add --key JAVA_HOME --value "$(jenv prefix)"
+  _temurin64-17:
+    steps:
+    - script@1:
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # make pipelines' return status equal the last command to exit with a non-zero status, or zero if all commands exit successfully
+            set -o pipefail
+            # debug log
+            set -x
+
+            jenv global temurin64-17.0.4
+            export JAVA_HOME="$(jenv prefix)"
+            envman add --key JAVA_HOME --value "$(jenv prefix)"
+  _temurin64-17-minor:
+    steps:
+    - script@1:
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # make pipelines' return status equal the last command to exit with a non-zero status, or zero if all commands exit successfully
+            set -o pipefail
+            # debug log
+            set -x
+
+            jenv global temurin64-17.0.4.1
+            export JAVA_HOME="$(jenv prefix)"
+            envman add --key JAVA_HOME --value "$(jenv prefix)"
+  _java-11:
+    steps:
+    - set-java-version@1:
+        inputs:
+        - set_java_version: '11'
+  _java-17:
+    steps:
+    - set-java-version@1:
+        inputs:
+        - set_java_version: '17'
+  linux-java-11:
+    before_run:
+    - _java-11
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: linux-docker-android-20.04
+        machine_type_id: elite-xl
+  java-11-elite-xl-linux-docker-android-20.04:
+    before_run:
+    - _java-11
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: linux-docker-android-20.04
+        machine_type_id: elite-xl
+  java-17-elite-xl-linux-docker-android-20.04:
+    before_run:
+    - _java-17
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: linux-docker-android-20.04
+        machine_type_id: elite-xl
+  java-11-g2.8core-osx-xcode-14.1.x:
+    before_run:
+    - _java-11
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2.8core
+  java-11-g2.12core-osx-xcode-14.1.x:
+    before_run:
+    - _java-11
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2.12core
+  java-11-g2-m1.8core-osx-xcode-14.1.x:
+    before_run:
+    - _java-11
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2-m1.8core
+  java-17-g2.8core-osx-xcode-14.1.x:
+    before_run:
+    - _java-17
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2.8core
+  java-17-g2.12core-osx-xcode-14.1.x:
+    before_run:
+    - _java-17
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2.12core
+  java-17-g2-m1.8core-osx-xcode-14.1.x:
+    before_run:
+    - _java-17
+    after_run:
+    - _build
+    meta:
+      bitrise.io:
+        stack: osx-xcode-14.1.x
+        machine_type_id: g2-m1.8core
+  
 meta:
   bitrise.io:
     stack: linux-docker-android-20.04
